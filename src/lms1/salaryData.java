@@ -8,8 +8,6 @@ package lms1;
  *
  * @author USER
  */
-
-
 public class salaryData {
 
     private double totalShift;
@@ -19,6 +17,7 @@ public class salaryData {
     public salaryData(double totalShift, double extraShift, String workerName) {
         this.totalShift = totalShift;
         this.extraShift = extraShift;
+
         this.workerName = workerName;
     }
 
@@ -29,7 +28,7 @@ public class salaryData {
     public double getExtraShift() {
         return extraShift;
     }
-    
+
     public String getWorkerName() {
         return workerName;
     }

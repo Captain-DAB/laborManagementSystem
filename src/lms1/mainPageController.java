@@ -9,7 +9,10 @@ import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.lang.String;
 import java.sql.Statement;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -237,6 +240,9 @@ public class mainPageController implements Initializable {
 
     @FXML
     private TextField totalShiftSal;
+
+    @FXML
+    private ComboBox<?> week;
 
     private Connection connect;
     private PreparedStatement prepare;
@@ -567,55 +573,122 @@ public class mainPageController implements Initializable {
 
     //Salary Form
 // Add this method to initialize the listener
-    private void initializeWorkerIdListener() {
+    private void initializeListeners() {
+        // Listener for worker ID input
         salary_id.textProperty().addListener((observable, oldValue, newValue) -> {
             if (!newValue.isEmpty()) {
+                // Fetch worker name for the provided ID
                 salaryData shifts = fetchShiftsForWorker(newValue);
+                // Set the worker name in the TextField
+                workerName.setText(shifts.getWorkerName());
+            } else {
+                // Clear all fields if ID is empty
+                clearFields();
+            }
+        });
 
+        // Listener for date range selection
+        week.setOnAction(event -> {
+            Object selectedWeekObj = week.getSelectionModel().getSelectedItem();
+            if (selectedWeekObj != null && selectedWeekObj instanceof String) {
+                String selectedWeek = (String) selectedWeekObj;
+                System.out.println("Selected Week: " + selectedWeek);
+                String[] dates = selectedWeek.split(" - ");
+                String startDateStr = dates[0];
+                String endDateStr = dates[1];
+                LocalDate startDate = LocalDate.parse(startDateStr, DateTimeFormatter.ofPattern("d/M/yyyy"));
+                LocalDate endDate = LocalDate.parse(endDateStr, DateTimeFormatter.ofPattern("d/M/yyyy"));
+                // Fetch shifts for the selected date range
+                salaryData shifts = fetchShiftsForWorker(salary_id.getText(), startDate, endDate);
+                // Update UI with the fetched shifts
                 totalShiftSal.setText(String.valueOf(shifts.getTotalShift()));
                 extraShiftSal.setText(String.valueOf(shifts.getExtraShift()));
                 overallShiftSal.setText(String.valueOf(shifts.getTotalShift() + shifts.getExtraShift()));
-
-                // Set the workerName in the TextField
-                workerName.setText(shifts.getWorkerName());
-            } else {
-                totalShiftSal.setText("");
-                extraShiftSal.setText("");
-                overallShiftSal.setText("");
-                workerName.setText("");
             }
         });
     }
 
     private salaryData fetchShiftsForWorker(String workerID) {
-        String sql = "SELECT d.name, SUM(a.totalshift), SUM(a.extrashift) "
-                + "FROM attendance a "
-                + "JOIN details d ON a.attendance_id = d.worker_id "
-                + "WHERE a.attendance_id = ? "
-                + "GROUP BY d.name";
+        String sql = "SELECT d.name "
+                + "FROM details d "
+                + "WHERE d.worker_id = ?";
         salaryData shifts = new salaryData(0, 0, ""); // Default values
 
         try (Connection connect = database.connectDB(); PreparedStatement prepare = connect.prepareStatement(sql)) {
-
             prepare.setString(1, workerID);
 
             try (ResultSet result = prepare.executeQuery()) {
                 if (result.next()) {
                     String workerName = result.getString("name");
-                    double totalShift = result.getDouble(2);
-                    double extraShift = result.getDouble(3);
-                    shifts = new salaryData(totalShift, extraShift, workerName);
+                    shifts = new salaryData(0, 0, workerName); // Only fetch worker name for now
                 } else {
-                     System.out.println("No records found for worker ID: " + workerID);
+                    System.out.println("No records found for worker ID: " + workerID);
                 }
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
         return shifts;
     }
+
+    private salaryData fetchShiftsForWorker(String workerID, LocalDate startDate, LocalDate endDate) {
+        String sql = "SELECT SUM(a.totalshift), SUM(a.extrashift) "
+                + "FROM attendance a "
+                + "WHERE a.attendance_id = ? AND a.date BETWEEN ? AND ?";
+
+        salaryData shifts = new salaryData(0, 0, ""); // Default values
+
+        try (Connection connect = database.connectDB(); PreparedStatement prepare = connect.prepareStatement(sql)) {
+            prepare.setString(1, workerID);
+            prepare.setDate(2, Date.valueOf(startDate));
+            prepare.setDate(3, Date.valueOf(endDate));
+
+            try (ResultSet result = prepare.executeQuery()) {
+                if (result.next()) {
+                    double totalShift = result.getDouble(1);
+                    double extraShift = result.getDouble(2);
+                    shifts = new salaryData(totalShift, extraShift, ""); // Worker name is not needed here
+                } else {
+                    System.out.println("No records found for worker ID: " + workerID);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return shifts;
+    }
+
+    private void clearFields() {
+        totalShiftSal.setText("");
+        extraShiftSal.setText("");
+        overallShiftSal.setText("");
+        workerName.setText("");
+    }
+
+    public void CalculateSalary() {
+        // Get the overall shift value from the overallShiftSal TextField
+        double overallShift = Double.parseDouble(overallShiftSal.getText());
+
+        // Calculate the salary based on the overall shift
+        double workerSalary = 0.0;
+        if (overallShift < 10) {
+            workerSalary = overallShift * 2000;
+        } else if (overallShift >= 10 && overallShift < 20) {
+            workerSalary = overallShift * 3000;
+        } else if (overallShift >= 20 && overallShift < 50) {
+            workerSalary = overallShift * 5000;
+        } else {
+            // Handle other cases if needed
+        }
+
+        // Display the calculated salary in the salary input field
+        salary.setText(String.valueOf(workerSalary));
+    }
+
+    ;
+
 
     /////Sign Out Function
     public void signout() {
@@ -725,6 +798,20 @@ public class mainPageController implements Initializable {
         extraShift.setItems(listData);
     }
 
+    private String[] weekList = {"1/2/2024 - 8/2/2024", "9/2/2024 - 16/2/2024", "17/2/2024 - 24/2/2024", "25/2/2024 - 3/3/2024"};
+
+    public void WeekToCalculate() {
+
+        List<String> weekL = new ArrayList<>();
+
+        for (String data : weekList) {
+            weekL.add(data);
+        }
+
+        ObservableList listData = FXCollections.observableArrayList(weekL);
+        week.setItems(listData);
+    }
+
     public void displayUsername() {
 
         String user = data.username;
@@ -793,11 +880,13 @@ public class mainPageController implements Initializable {
         displayUsername();
         TotalShiftList();
         ExtraShiftList();
+        WeekToCalculate();
 
         tableShowData();
         tableShowAttendanceData();
 
-        initializeWorkerIdListener();
+        initializeListeners();
+
     }
 
 }
