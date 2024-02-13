@@ -26,6 +26,8 @@ public class LMS1 extends Application {
          
         stage.setScene(scene);
         stage.show();
+        
+        
     }
 
     /**

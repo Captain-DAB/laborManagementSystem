@@ -155,6 +155,9 @@ public class mainPageController implements Initializable {
     private Button worker_next;
 
     @FXML
+    private Button worker_back;
+
+    @FXML
     private AnchorPane tableForm;
 
     @FXML
@@ -173,9 +176,6 @@ public class mainPageController implements Initializable {
     private Button salaryBtn;
 
     @FXML
-    private TableView<attendanceData> attendanceView;
-
-    @FXML
     private TextField attendance_id;
 
     @FXML
@@ -192,27 +192,6 @@ public class mainPageController implements Initializable {
 
     @FXML
     private TextField building;
-
-    @FXML
-    private TableColumn<attendanceData, String> col_building;
-
-    @FXML
-    private TableColumn<attendanceData, String> col_id2;
-
-    @FXML
-    private TableColumn<attendanceData, String> col_date2;
-
-    @FXML
-    private TableColumn<attendanceData, String> col_extrashift;
-
-    @FXML
-    private TableColumn<attendanceData, String> col_shift;
-
-    @FXML
-    private TableColumn<attendanceData, String> col_timein;
-
-    @FXML
-    private TableColumn<attendanceData, String> col_timeout;
 
     @FXML
     private AnchorPane salaryForm;
@@ -251,6 +230,29 @@ public class mainPageController implements Initializable {
 
     private Alert alert;
 
+    private reportController reportController;
+
+    public void setReportController(reportController reportController) {
+        this.reportController = reportController;
+    }
+
+    public void generateReport(ActionEvent event) {
+        try {
+            // Load the FXML file of the ReportController
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("report.fxml"));
+            Parent root = loader.load();
+
+            // Create a new stage for the ReportController page
+            Stage stage = new Stage();
+            stage.setScene(new Scene(root));
+            stage.setTitle("Report");
+            stage.show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    //Add details to table
     public void tableAddBtn() {
 
         if (worker_id.getText().isEmpty()
@@ -337,6 +339,7 @@ public class mainPageController implements Initializable {
             }
         }
     }
+//Clear Details Table
 
     public void tableClearBtn() {
 
@@ -356,10 +359,9 @@ public class mainPageController implements Initializable {
         nok_contact.setText("");
         data.id = 0;
 
-        // Set the prompt text again
-        experience.setPromptText("Choose Experience...");
-        identification.setPromptText("Choose Identification...");
-        status.setPromptText("Choose Status...");
+        ExperienceList();
+        IdentityList();
+        StatusList();
 
     }
 
@@ -431,6 +433,7 @@ public class mainPageController implements Initializable {
 
         tableView.setItems(tableListData);
     }
+//Update data in attendance module
 
     public void tableUpdateBtn() {
         if (attendance_id.getText().isEmpty()
@@ -494,7 +497,10 @@ public class mainPageController implements Initializable {
                     alert.setContentText("Successfully Updated");
                     alert.showAndWait();
 
-                    tableShowAttendanceData();
+                    // Call method from ReportController
+                    if (reportController != null) {
+                        reportController.tableShowAttendanceData();
+                    }
                     attendanceClearBtn();
                 }
 
@@ -503,6 +509,7 @@ public class mainPageController implements Initializable {
             }
         }
     }
+//Clear Data in Attendance module
 
     public void attendanceClearBtn() {
 
@@ -514,65 +521,12 @@ public class mainPageController implements Initializable {
         building.setText("");
         data.id = 0;
 
-        // Set the prompt text again
-        extraShift.setPromptText("Choose ExtraShift Undertaken...");
-    }
-
-    //MERGE ALL DATAS in Attendance
-    public ObservableList<attendanceData> tableDataListAttendance() {
-
-        ObservableList<attendanceData> listAttData = FXCollections.observableArrayList();
-
-        String sql = "SELECT * FROM attendance";
-
-        connect = database.connectDB();
-
-        try {
-            prepare = connect.prepareStatement(sql);
-            result = prepare.executeQuery();
-
-            attendanceData attData;
-
-            while (result.next()) {
-                attData = new attendanceData(
-                        result.getInt("id"),
-                        result.getString("attendance_id"),
-                        result.getString("totalshift"),
-                        result.getString("extrashift"),
-                        result.getString("timein"),
-                        result.getString("timeout"),
-                        result.getString("building"),
-                        result.getDate("date")
-                );
-                listAttData.add(attData);
-
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return listAttData;
-    }
-
-    //TO SHOW Attendance DATA ON OUR TABLE
-    private ObservableList<attendanceData> tableListAttendanceData;
-
-    public void tableShowAttendanceData() {
-        tableListAttendanceData = tableDataListAttendance();
-
-        col_id2.setCellValueFactory(new PropertyValueFactory<>("attendanceId"));
-        col_shift.setCellValueFactory(new PropertyValueFactory<>("totalShift"));
-        col_extrashift.setCellValueFactory(new PropertyValueFactory<>("extraShift"));
-        col_timein.setCellValueFactory(new PropertyValueFactory<>("timeIn"));
-        col_timeout.setCellValueFactory(new PropertyValueFactory<>("timeOut"));
-        col_building.setCellValueFactory(new PropertyValueFactory<>("building"));
-        col_date2.setCellValueFactory(new PropertyValueFactory<>("date"));
-
-        attendanceView.setItems(tableListAttendanceData);
+        TotalShiftList();
+        ExtraShiftList();
     }
 
     //Salary Form
-// Add this method to initialize the listener
+//Method to initialize the listener
     private void initializeListeners() {
         // Listener for worker ID input
         salary_id.textProperty().addListener((observable, oldValue, newValue) -> {
@@ -600,13 +554,14 @@ public class mainPageController implements Initializable {
                 LocalDate endDate = LocalDate.parse(endDateStr, DateTimeFormatter.ofPattern("d/M/yyyy"));
                 // Fetch shifts for the selected date range
                 salaryData shifts = fetchShiftsForWorker(salary_id.getText(), startDate, endDate);
-                // Update UI with the fetched shifts
+                // Update textfields with the fetched shifts
                 totalShiftSal.setText(String.valueOf(shifts.getTotalShift()));
                 extraShiftSal.setText(String.valueOf(shifts.getExtraShift()));
                 overallShiftSal.setText(String.valueOf(shifts.getTotalShift() + shifts.getExtraShift()));
             }
         });
     }
+//Fetch Shifts for Worker
 
     private salaryData fetchShiftsForWorker(String workerID) {
         String sql = "SELECT d.name "
@@ -659,6 +614,7 @@ public class mainPageController implements Initializable {
 
         return shifts;
     }
+//Clear Fields for Salary Module 
 
     private void clearFields() {
         totalShiftSal.setText("");
@@ -666,6 +622,7 @@ public class mainPageController implements Initializable {
         overallShiftSal.setText("");
         workerName.setText("");
     }
+//Calculate Salary
 
     public void CalculateSalary() {
         // Get the overall shift value from the overallShiftSal TextField
@@ -680,7 +637,7 @@ public class mainPageController implements Initializable {
         } else if (overallShift >= 20 && overallShift < 50) {
             workerSalary = overallShift * 5000;
         } else {
-            // Handle other cases if needed
+            // Handle other cases
         }
 
         // Display the calculated salary in the salary input field
@@ -690,7 +647,7 @@ public class mainPageController implements Initializable {
     ;
 
 
-    /////Sign Out Function
+    /////////Sign Out Function
     public void signout() {
 
         try {
@@ -812,6 +769,7 @@ public class mainPageController implements Initializable {
         week.setItems(listData);
     }
 
+////////display username that logs in
     public void displayUsername() {
 
         String user = data.username;
@@ -853,24 +811,25 @@ public class mainPageController implements Initializable {
             attendanceForm.setVisible(false);
             salaryForm.setVisible(true);
 
+        } else if (event.getSource() == worker_next) {
+            tableForm.setVisible(false);
+            workerForm.setVisible(false);
+            attendanceForm.setVisible(true);
+            salaryForm.setVisible(false);
+
+        } else if (event.getSource() == worker_back) {
+            tableForm.setVisible(false);
+            workerForm.setVisible(true);
+            attendanceForm.setVisible(false);
+            salaryForm.setVisible(false);
+
+            ExperienceList();
+            IdentityList();
+            StatusList();
+
         }
     }
 
-//    public void backToWorkerDetails() {
-//        workerForm.setVisible(true);
-//        attendanceForm.setVisible(false);
-//        tableForm.setVisible(false);
-//    }
-//
-//    public void viewBtn() {
-//        tableForm.setVisible(true);
-//        workerForm.setVisible(false);
-//        attendanceForm.setVisible(false);
-//    }
-//
-//    public void NextToAttendance() {
-//        workerForm.setVisible(false);
-//        attendanceForm.setVisible(true);
 //    }
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -883,7 +842,7 @@ public class mainPageController implements Initializable {
         WeekToCalculate();
 
         tableShowData();
-        tableShowAttendanceData();
+//        tableShowAttendanceData();
 
         initializeListeners();
 
