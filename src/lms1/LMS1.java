@@ -11,8 +11,9 @@ import javafx.scene.Scene;
 import javafx.stage.Stage;
 
 /**
- *
- * @author USER
+ * You should login with this as it is being registered in the database. If not create a new account and login with it
+ * Username : admin
+ * password : admin12345
  */
 public class LMS1 extends Application {
     
